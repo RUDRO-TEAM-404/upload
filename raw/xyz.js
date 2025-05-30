@@ -1,1 +1,0 @@
-tomake ami love kori
