@@ -1,75 +1,115 @@
-const fetch = require("node-fetch");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const ytSearch = require("yt-search");
 
 module.exports = {
-  config: {
-    name: "sing",
-    aliases: ["music", "song"],
-    version: "0.0.2",
-    author: "ArYAN",
-    countDown: 5,
-    role: 0,
-    shortDescription: "sing tomake chai",
-    longDescription: "sing janne kyun tanveer evan",
-    category: "MUSIC",
-    guide: "/sing Shape of You"
-  },
+  name: "sing",
+  prefix: true,
+  admin: false,
+  vip: false,
+  role: 0,
+  author: "ArYAN",
+  version: "0.0.1",
+  description: "Searches and sends music/songs from YouTube.",
+  category: "music",
+  cooldown: 5,
+  guide: "{p}sing <song name> [audio/video]",
 
-  xyz: async function({ api, event, args }) {
-    const chatId = event.chat.id;
-    const msgId = event.message_id;
-    const songName = args.join(" ");
-    const type = "audio";
-
-    if (!songName) {
-      return api.sendMessage(chatId, "🚫 Please provide a song name (e.g. `/sing Shape of You`).", {
-        reply_to_message_id: msgId,
-        parse_mode: "Markdown",
-      });
+  async xyz({ chat, msg, args }) {
+    if (!args.length) {
+      return chat.reply("Please provide a song name to search for.\nUsage: `{p}sing <song name> [audio/video]`");
     }
 
-    const loadingMsg = await api.sendMessage(chatId, "⌛ Searching and downloading your song...", {
-      reply_to_message_id: msgId,
-    });
+    let downloadType = "audio";
+    const lastArg = args[args.length - 1].toLowerCase();
+
+    let songName;
+    if (lastArg === "audio" || lastArg === "video") {
+      downloadType = lastArg;
+      songName = args.slice(0, -1).join(" ");
+    } else {
+      songName = args.join(" ");
+    }
+
+    if (!songName) {
+      return chat.reply("Please provide a song name to search for.");
+    }
+
+    const processingMessage = await chat.reply("🎵 Searching and preparing your song...");
 
     try {
       const searchResults = await ytSearch(songName);
-      if (!searchResults?.videos?.length) throw new Error("No results found.");
 
-      const top = searchResults.videos[0];
-      const apiUrl = `https://noobs-xyz-aryan.vercel.app/youtube?id=${top.videoId}&type=${type}&apikey=itzaryan`;
+      if (!searchResults || !searchResults.videos.length) {
+        await chat.editMessageText("❌ No results found for your search query.", {
+          message_id: processingMessage.message_id,
+        });
+        return;
+      }
 
-      const downloadRes = await axios.get(apiUrl);
-      if (!downloadRes.data?.downloadUrl) throw new Error("No downloadUrl received.");
+      const topResult = searchResults.videos[0];
+      const videoId = topResult.videoId;
+      const songTitle = topResult.title;
 
-      const dlUrl = downloadRes.data.downloadUrl;
-      const res = await fetch(dlUrl);
-      if (!res.ok) throw new Error(`Download failed (status: ${res.status}).`);
+      const apiKey = "itzaryan";
+      const apiUrl = `https://noobs-xyz-aryan.vercel.app/youtube?id=${videoId}&type=${downloadType}&apikey=${apiKey}`;
 
-      const fileBuffer = await res.buffer();
-      const fileExt = type === "audio" ? "mp3" : "mp4";
-      const fileName = `${top.title}.${fileExt}`.replace(/[\\/:"*?<>|]+/g, "");
-      const filePath = path.join(__dirname, fileName);
-      fs.writeFileSync(filePath, fileBuffer);
-
-      await api.deleteMessage(chatId, loadingMsg.message_id);
-
-      await api.sendAudio(chatId, fs.createReadStream(filePath), {
-        caption: `🎵 MUSIC\n━━━━━━━━━━━━━━━\n\n${top.title}`,
-        parse_mode: "Markdown",
-        reply_to_message_id: msgId,
+      await chat.editMessageText(`⏳ Found "${songTitle}". Downloading...`, {
+        message_id: processingMessage.message_id,
       });
 
-      fs.unlinkSync(filePath);
-    } catch (err) {
-      await api.deleteMessage(chatId, loadingMsg.message_id);
-      await api.sendMessage(chatId, "❌ Failed to download the song. Please try again later.", {
-        reply_to_message_id: msgId,
+      const downloadResponse = await axios.get(apiUrl);
+      const downloadUrl = downloadResponse.data.downloadUrl;
+
+      if (!downloadUrl) {
+        throw new Error("Failed to get download URL from the API.");
+      }
+
+      const response = await axios({
+        method: "get",
+        url: downloadUrl,
+        responseType: "stream",
       });
-      console.error("Sing command error:", err);
+
+      const fileExtension = downloadType === "audio" ? "mp3" : "mp4";
+      const safeTitle = songTitle.replace(/[^a-zA-Z0-9]/g, "_");
+      const filename = `${safeTitle}.${fileExtension}`;
+      const downloadPath = path.join(__dirname, filename);
+
+      const writer = fs.createWriteStream(downloadPath);
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on("finish", resolve);
+        writer.on("error", reject);
+      });
+
+      await chat.editMessageText(`✅ Downloaded "${songTitle}". Sending...`, {
+        message_id: processingMessage.message_id,
+      });
+
+      if (downloadType === "audio") {
+        await chat.sendAudio(downloadPath, {
+          caption: songTitle,
+          parse_mode: "Markdown",
+        });
+      } else {
+        await chat.sendVideo(downloadPath, {
+          caption: songTitle,
+          parse_mode: "Markdown",
+        });
+      }
+
+      fs.unlinkSync(downloadPath);
+      await chat.deleteMessage(processingMessage.message_id);
+
+    } catch (error) {
+      console.error(`Error in sing command: ${error.message}`);
+      if (processingMessage && processingMessage.message_id) {
+        await chat.deleteMessage(processingMessage.message_id).catch(() => {});
+      }
+      await chat.reply(`⚠️ Failed to download or send song: ${error.message}`);
     }
-  }
+  },
 };
