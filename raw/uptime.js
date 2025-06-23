@@ -22,9 +22,9 @@ module.exports = {
 
     const cuteFont = (text) => {
       const mapping = {
-        '0': '𝟘', '1': '𝟙', '2': '𝟚', '3': '𝟛', '4': '𝟜',
-        '5': '𝟝', '6': '𝟞', '7': '𝟟', '8': '𝟠', '9': '𝟡',
-        'D': '𝒟', 'H': '𝐻', 'M': '𝑀', 'S': '𝒮', ':': ':',
+        '0': '0', '1': '1', '2': '2', '3': '3', '4': '4',
+        '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
+        'D': 'D', 'H': 'D', 'M': 'M', 'S': 'S', ':': ':',
         ' ': ' '
       };
       return text.split('').map(char => mapping[char] || char).join('');
@@ -32,7 +32,7 @@ module.exports = {
 
     const uptimeMessage =
       `🌸 *Bot Uptime* 🌸\n\n` +
-      `╰┈➤ ${cuteFont(d)}𝒟 ${cuteFont(h)}𝐻 ${cuteFont(m)}𝑀 ${cuteFont(s)}𝒮\n\n` +
+      `╰┈➤ ${cuteFont(d)}Day's ${cuteFont(h)}Hour's ${cuteFont(m)}Minute's${cuteFont(s)}Second's\n\n` +
       `✨ _Always here to help!_ ✨`;
 
     await chat.reply(uptimeMessage);
