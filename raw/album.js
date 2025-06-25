@@ -1,3 +1,16 @@
+const axios = require("axios");
+const fs = require("fs").promises;
+const path = require("path");
+
+const API_BASE_URL = "https://mahmud-album5.onrender.com";
+
+module.exports = {
+  name: "album",
+  prefix: true,
+  author: "ArYAN",
+  version: "0.0.1",
+  description: "Browse and add videos to categories.",
+
 async xyz({ bot, chat, msg, args, addAnswerCallback, config }) {
     const categories = [
       { displayName: "Funny Video", realName: "funny", caption: "Here's your Funny Video!" },
